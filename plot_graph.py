@@ -13,6 +13,9 @@ def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
     """
     print("-" * 100)
 
+    if "/" in env_name:
+        env_name = env_name.replace("/", "-")
+
     # Задание параметров сглаживания
     window_len_smooth = 20
     min_window_len_smooth = 1
@@ -136,4 +139,6 @@ def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
 
 
 if __name__ == "__main__":
-    save_graph("CartPole-v1")
+    env_name = "CartPole-v1"
+
+    save_graph(env_name)
