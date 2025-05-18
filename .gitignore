@@ -1,7 +1,7 @@
 checkpoints/
 graphs/
 logs/
-
+craftium/
 
 # Стандартные игноры для python.
 # Byte-compiled / optimized / DLL files

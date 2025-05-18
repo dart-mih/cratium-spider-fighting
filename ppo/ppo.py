@@ -84,7 +84,7 @@ class PPO:
 
         P.S. Для каждого запуска содается отдельный лог.
         """
-        log_dir = "logs/" + self.env_name + "/"
+        log_dir = "logs/" + self.env_name
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
