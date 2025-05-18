@@ -43,6 +43,10 @@ class PPO:
         :param log_freq_mult: множитель частоты логирования (множитель к max_ep_len)
         """
         self.env_name = env_name
+
+        if "/" in env_name:
+            self.env_name = env_name.replace("/", "-")
+
         self.max_ep_len = max_ep_len
         self.max_training_timesteps = max_train_timesteps
         self.print_freq = max_ep_len * print_freq_mult
@@ -84,7 +88,7 @@ class PPO:
 
         P.S. Для каждого запуска содается отдельный лог.
         """
-        log_dir = "logs/" + self.env_name
+        log_dir = "logs/" + self.env_name + "/"
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
