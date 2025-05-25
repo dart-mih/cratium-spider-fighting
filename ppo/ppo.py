@@ -65,7 +65,7 @@ class PPO:
         self.buffer = RolloutBuffer()
 
         # Получаем размерности состояния и действия среды.
-        self.state_dim = env.observation_space.shape[0]
+        self.state_dim = env.observation_space.shape
         self.action_dim = env.action_space.n
 
         # Инициалзиация PPO агента.
