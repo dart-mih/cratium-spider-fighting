@@ -1,6 +1,10 @@
 import os
+
+from dotenv import load_dotenv
 import pandas as pd
 import matplotlib.pyplot as plt
+
+load_dotenv("parameters.env")
 
 
 def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
@@ -139,6 +143,7 @@ def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
 
 
 if __name__ == "__main__":
-    env_name = "CartPole-v1"
+    # Загружаем параметры из конфига.
+    env_name = os.getenv("ENV_NAME")
 
     save_graph(env_name)

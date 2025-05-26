@@ -20,7 +20,7 @@ class PPO:
         save_model_freq: int,
         update_timestep_mult: int = 4,
         k_epochs: int = 80,
-        els_clip: float = 0.2,
+        eps_clip: float = 0.2,
         gamma: float = 0.99,
         lr_actor: float = 0.0003,
         lr_critic: float = 0.001,
@@ -35,7 +35,7 @@ class PPO:
         :param save_model_freq: частота сохранения модели (в шагах обучения)
         :param update_timestep_mult: множитель частоты обновления (множитель к max_ep_len)
         :param k_epochs: количество эпох обучения на 1 пакете данных из буфера
-        :param els_clip: коэффициент клипинга PPO (обычно изменяется в пределах 0.2 до 0.3)
+        :param eps_clip: коэффициент клипинга PPO (обычно изменяется в пределах 0.2 до 0.3)
         :param gamma: коэффициент дисконтирования (упор на текущую или будущую выгоду)
         :param lr_actor: learning rate для актера
         :param lr_critic: learning rate для критика
@@ -55,7 +55,7 @@ class PPO:
         self.update_timestep = max_ep_len * update_timestep_mult
 
         self.k_epochs = k_epochs
-        self.eps_clip = els_clip
+        self.eps_clip = eps_clip
         self.gamma = gamma
 
         self.lr_actor = lr_actor
