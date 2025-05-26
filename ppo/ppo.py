@@ -191,9 +191,8 @@ class PPO:
 
         # Цикл обучения
         states, _ = self.env.reset()
+        current_ep_reward = [0 for _ in range(self.env_count)]
         for time_step in tqdm(range(self.max_training_timesteps), "Шаг"):
-            current_ep_reward = [0, 0, 0, 0]
-
             # Выбор действия с использованием политики
             actions = []
             actions_logprob = []
@@ -274,6 +273,7 @@ class PPO:
                     log_running_episodes += 1
 
                     i_episode += 1
+                    current_ep_reward[i] = 0
 
         log_f.close()
 
