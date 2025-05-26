@@ -263,7 +263,6 @@ class PPO:
             i_episode += 1
 
         log_f.close()
-        self.env.close()
 
         # Завершение обучения
         end_time = datetime.now().replace(microsecond=0)
@@ -299,7 +298,6 @@ class PPO:
             print(f"Эпизод: {ep} \t\t Награда: {round(ep_reward, 2)}")
             ep_reward = 0
 
-        self.env.close()
         print("-" * 100)
 
         avg_test_reward = test_running_reward / total_test_episodes

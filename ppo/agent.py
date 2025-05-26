@@ -118,6 +118,8 @@ class PPOAgent:
                 - 0.01 * dist_entropy
             )
 
+            # Освобождаем память GPU
+            torch.cuda.empty_cache()
             # Шаг градиентного спуска
             self.optimizer.zero_grad()
             loss.mean().backward()
