@@ -1,7 +1,9 @@
 checkpoints/
 graphs/
 logs/
-
+craftium/
+minetest*/
+myenv/
 
 # Стандартные игноры для python.
 # Byte-compiled / optimized / DLL files
