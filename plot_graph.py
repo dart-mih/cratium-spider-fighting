@@ -1,6 +1,10 @@
 import os
+
+from dotenv import load_dotenv
 import pandas as pd
 import matplotlib.pyplot as plt
+
+load_dotenv("parameters.env")
 
 
 def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
@@ -12,6 +16,9 @@ def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
     :param fig_height: высота сохраняемой фигуры
     """
     print("-" * 100)
+
+    if "/" in env_name:
+        env_name = env_name.replace("/", "-")
 
     # Задание параметров сглаживания
     window_len_smooth = 20
@@ -136,4 +143,7 @@ def save_graph(env_name: str, fig_width: int = 10, fig_height: int = 6) -> None:
 
 
 if __name__ == "__main__":
-    save_graph("CartPole-v1")
+    # Загружаем параметры из конфига.
+    env_name = os.getenv("ENV_NAME")
+
+    save_graph(env_name)
