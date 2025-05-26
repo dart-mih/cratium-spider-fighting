@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 
 import torch
+from tqdm import tqdm
 from gym import Env
 
 from .agent import PPOAgent
@@ -14,6 +15,7 @@ class PPO:
     def __init__(
         self,
         env: Env,
+        env_count: int,
         env_name: str,
         max_ep_len: int,
         max_train_timesteps: int,
@@ -28,7 +30,8 @@ class PPO:
         log_freq_mult: int = 2,
     ):
         """
-        :param env: среда Gym, где будет происходить обучения PPO
+        :param env: среда Gym, где будет происходить обучения PPO (Ожидается синхронный вектор сред)
+        :param env_count: количество одинаковых сред, которые запущены параллельно.
         :param env_name: название среды (влияет на папки сохранения результатов)
         :param max_ep_len: макс. длина одного эпизода
         :param max_train_timesteps: общая длина шагов обучения (после скольки шагов обучения прекратится)
@@ -62,11 +65,12 @@ class PPO:
         self.lr_critic = lr_critic
 
         self.env = env
+        self.env_count = env_count
         self.buffer = RolloutBuffer()
 
         # Получаем размерности состояния и действия среды.
-        self.state_dim = env.observation_space.shape
-        self.action_dim = env.action_space.n
+        self.state_dim = env.observation_space.shape[1:]
+        self.action_dim = env.action_space.nvec[0]
 
         # Инициалзиация PPO агента.
         self.ppo_agent = PPOAgent(
@@ -118,6 +122,7 @@ class PPO:
             "Текущий номер запуска для обучения на среде " + self.env_name + " : ",
             self.run_num,
         )
+        print("Количество параллельно запущенных сред:", self.env_count)
         print("Логирование по пути: " + self.log_f_name)
         print("-" * 100)
 
@@ -182,85 +187,93 @@ class PPO:
         log_running_reward = 0
         log_running_episodes = 0
 
-        time_step = 0
         i_episode = 0
 
         # Цикл обучения
-        while time_step <= self.max_training_timesteps:
+        states, _ = self.env.reset()
+        for time_step in tqdm(range(self.max_training_timesteps), "Шаг"):
+            current_ep_reward = [0, 0, 0, 0]
 
-            state, _ = self.env.reset()
-            current_ep_reward = 0
-
-            for t in range(1, self.max_ep_len + 1):
-                # Выбор действия с использованием политики
+            # Выбор действия с использованием политики
+            actions = []
+            actions_logprob = []
+            state_vals = []
+            states_t = []
+            for state in states:
                 action, action_logprob, state_val, state_t = (
                     self.ppo_agent.select_action(state)
                 )
-                state, reward, term, trunc, _ = self.env.step(action.item())
-                done = term or trunc
 
-                # Сохраняем итерацию в буфер для обучения
-                self.buffer.states.append(state_t)
-                self.buffer.actions.append(action)
-                self.buffer.logprobs.append(action_logprob)
-                self.buffer.state_values.append(state_val)
-                self.buffer.rewards.append(reward)
-                self.buffer.is_terminals.append(done)
+                actions.append(action)
+                actions_logprob.append(action_logprob)
+                state_vals.append(state_val)
+                states_t.append(state_t)
+            states, rewards, terms, truncs, _ = self.env.step(
+                [action.item() for action in actions]
+            )
+            dones = [term or trunc for term, trunc in zip(terms, truncs)]
 
-                time_step += 1
-                current_ep_reward += reward
+            # Сохраняем итерацию в буфер для обучения
+            self.buffer.states.extend(states_t)
+            self.buffer.actions.extend(actions)
+            self.buffer.logprobs.extend(actions_logprob)
+            self.buffer.state_values.extend(state_vals)
+            self.buffer.rewards.extend(rewards)
+            self.buffer.is_terminals.extend(dones)
 
-                # Обновляем агента PPO
-                if time_step % self.update_timestep == 0:
-                    self.ppo_agent.update(self.buffer)
-                    self.buffer.clear()
+            time_step += 1
 
-                # Логгируем среднюю награду
-                if time_step % self.log_freq == 0:
-                    log_avg_reward = log_running_reward / log_running_episodes
-                    log_avg_reward = round(log_avg_reward, 4)
+            for i in range(self.env_count):
+                current_ep_reward[i] += rewards[i]
 
-                    log_f.write(
-                        "{},{},{}\n".format(i_episode, time_step, log_avg_reward)
-                    )
-                    log_f.flush()
+            # Обновляем агента PPO
+            if time_step % self.update_timestep == 0:
+                self.ppo_agent.update(self.buffer, self.env_count)
+                self.buffer.clear()
 
-                    log_running_reward = 0
-                    log_running_episodes = 0
+            # Логгируем среднюю награду
+            if time_step % self.log_freq == 0:
+                log_avg_reward = log_running_reward / log_running_episodes
+                log_avg_reward = round(log_avg_reward, 4)
 
-                # Печать средней награды
-                if time_step % self.print_freq == 0:
-                    print_avg_reward = print_running_reward / print_running_episodes
-                    print_avg_reward = round(print_avg_reward, 2)
+                log_f.write("{},{},{}\n".format(i_episode, time_step, log_avg_reward))
+                log_f.flush()
 
-                    print(
-                        f"Эпизод : {i_episode} \t\t Шаг : {time_step} \t\t Средняя награда : {print_avg_reward}"
-                    )
+                log_running_reward = 0
+                log_running_episodes = 0
 
-                    print_running_reward = 0
-                    print_running_episodes = 0
+            # Печать средней награды
+            if time_step % self.print_freq == 0:
+                print_avg_reward = print_running_reward / print_running_episodes
+                print_avg_reward = round(print_avg_reward, 2)
 
-                # Сохранение модели
-                if time_step % self.save_model_freq == 0:
-                    print("Сохраняем модель по пути: " + self.checkpoint_path)
-                    self.ppo_agent.save(self.checkpoint_path)
-                    print("Модель успешно сохранена")
-                    print(
-                        "Прошедшее время: ",
-                        datetime.now().replace(microsecond=0) - start_time,
-                    )
+                print(
+                    f"Эпизод : {i_episode} \t\t Шаг : {time_step} \t\t Средняя награда : {print_avg_reward}"
+                )
 
+                print_running_reward = 0
+                print_running_episodes = 0
+
+            # Сохранение модели
+            if time_step % self.save_model_freq == 0:
+                print("Сохраняем модель по пути: " + self.checkpoint_path)
+                self.ppo_agent.save(self.checkpoint_path)
+                print("Модель успешно сохранена")
+                print(
+                    "Прошедшее время: ",
+                    datetime.now().replace(microsecond=0) - start_time,
+                )
+
+            for i, done in enumerate(dones):
+                # Обновление счётчиков наград
                 if done:
-                    break
+                    print_running_reward += current_ep_reward[i]
+                    print_running_episodes += 1
 
-            # Обновление счётчиков наград
-            print_running_reward += current_ep_reward
-            print_running_episodes += 1
+                    log_running_reward += current_ep_reward[i]
+                    log_running_episodes += 1
 
-            log_running_reward += current_ep_reward
-            log_running_episodes += 1
-
-            i_episode += 1
+                    i_episode += 1
 
         log_f.close()
 
@@ -275,32 +288,38 @@ class PPO:
         Тестирует обученного агента в среде.
 
         :param total_test_episodes: количество тестовых эпизодов
-        :param render: отображать ли среду
-        :param frame_delay: задержка между кадрами
         """
         test_running_reward = 0
 
         for ep in range(1, total_test_episodes + 1):
-            ep_reward = 0
-            state, _ = self.env.reset()
+            ep_reward = [0 for _ in range(self.env_count)]
+            states, _ = self.env.reset()
 
             for _ in range(1, self.max_ep_len + 1):
-                action, _, _, _ = self.ppo_agent.select_action(state)
-                state, reward, term, trunc, _ = self.env.step(action.item())
-                done = term or trunc
+                actions = []
+                for state in states:
+                    action, _, _, _ = self.ppo_agent.select_action(state)
+                    actions.append(action.item())
 
-                ep_reward += reward
+                states, rewards, terms, truncs, _ = self.env.step(actions)
+                dones = [term or trunc for term, trunc in zip(terms, truncs)]
 
-                if done:
+                for i in range(self.env_count):
+                    ep_reward[i] += rewards[i]
+
+                if any(dones):
                     break
 
-            test_running_reward += ep_reward
-            print(f"Эпизод: {ep} \t\t Награда: {round(ep_reward, 2)}")
-            ep_reward = 0
+            for i, done in enumerate(dones):
+                if done:
+                    test_running_reward += ep_reward[i]
+                    print(f"Эпизод: {ep} \t\t Средняя награда: {round(ep_reward, 2)}")
+
+                    break
 
         print("-" * 100)
 
-        avg_test_reward = test_running_reward / total_test_episodes
+        avg_test_reward = test_running_reward / (total_test_episodes * self.env_count)
         avg_test_reward = round(avg_test_reward, 2)
         print("Средняя награда в тестировании: " + str(avg_test_reward))
         print("-" * 100)

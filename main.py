@@ -2,17 +2,29 @@ import os
 
 from dotenv import load_dotenv
 import gymnasium as gym
+from gymnasium.vector import SyncVectorEnv
 import craftium
 
 from ppo import PPO
 from plot_graph import save_graph
+from utility import delete_minetest_run_folders
 
 load_dotenv("parameters.env")
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+
+def make_env(env_name, frameskip=3):
+    def _make():
+        env = gym.make(env_name, frameskip=frameskip)
+        return env
+
+    return _make
+
+
 if __name__ == "__main__":
     # Загружаем параметры из конфига.
     env_name = os.getenv("ENV_NAME")
+    env_count = int(os.getenv("ENV_COUNT"))
     max_ep_len = int(os.getenv("MAX_EP_LEN"))
 
     max_train_timesteps = int(os.getenv("MAX_TRAIN_TIMESTEPS"))
@@ -28,10 +40,13 @@ if __name__ == "__main__":
 
     save_model_freq = int(os.getenv("SAVE_MODEL_FREQ"))
 
-    env = gym.make(env_name, frameskip=3)
+    delete_minetest_run_folders(".")
+
+    env = SyncVectorEnv([make_env(env_name) for _ in range(env_count)])
 
     ppo = PPO(
         env=env,
+        env_count=env_count,
         env_name=env_name,
         max_ep_len=max_ep_len,
         max_train_timesteps=max_train_timesteps,

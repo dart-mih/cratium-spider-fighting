@@ -57,11 +57,12 @@ class PPOAgent:
 
         return action, action_logprob, state_val, state
 
-    def update(self, buffer: RolloutBuffer) -> None:
+    def update(self, buffer: RolloutBuffer, grad_accum_steps: int = 1) -> None:
         """
-        Обновляет политику на основе буфера с помощью метода Монте-Карло.
+        Обновляет политику на основе буфера с помощью метода Монте-Карло с поддержкой накопления градиентов.
 
         :param buffer: экземпляр RolloutBuffer с собранными данными для обучения
+        :param grad_accum_steps: количество шагов для накопления градиентов перед обновлением весов
         """
         rewards = []
         discounted_reward = 0
@@ -94,36 +95,53 @@ class PPOAgent:
         # Вычисление преимущества (advantage)
         advantages = rewards.detach() - old_state_values.detach()
 
+        # Разбиваем данные на мини-батчи для gradient accumulation
+        batch_size = len(buffer.states)
+        mini_batch_size = batch_size // grad_accum_steps
+
         # Оптимизация политики в течение K эпох
         for _ in range(self.K_epochs):
-            # Оцениваем старые состояния и действия
-            logprobs, state_values, dist_entropy = self.policy.evaluate(
-                old_states, old_actions
-            )
-            state_values = torch.squeeze(state_values)
+            indices = torch.randperm(batch_size, device=device)
 
-            # Находим отношения прошлой и текущей оценки
-            ratios = torch.exp(logprobs - old_logprobs.detach())
+            for start in range(0, batch_size, mini_batch_size):
+                end = start + mini_batch_size
+                mini_batch_indices = indices[start:end]
 
-            # Находим Surrogate Loss
-            surr1 = ratios * advantages
-            surr2 = (
-                torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            )
+                # Выбираем мини-батч
+                mb_states = old_states[mini_batch_indices]
+                mb_actions = old_actions[mini_batch_indices]
+                mb_old_logprobs = old_logprobs[mini_batch_indices]
+                mb_rewards = rewards[mini_batch_indices]
+                mb_advantages = advantages[mini_batch_indices]
 
-            # Финальный clipped loss
-            loss = (
-                -torch.min(surr1, surr2)
-                + 0.5 * self.MseLoss(state_values, rewards)
-                - 0.01 * dist_entropy
-            )
+                # Оцениваем мини-батч
+                logprobs, state_values, dist_entropy = self.policy.evaluate(
+                    mb_states, mb_actions
+                )
+                state_values = torch.squeeze(state_values)
+                ratios = torch.exp(logprobs - mb_old_logprobs.detach())
 
-            # Освобождаем память GPU
-            torch.cuda.empty_cache()
-            # Шаг градиентного спуска
-            self.optimizer.zero_grad()
-            loss.mean().backward()
+                # Находим Surrogate Loss
+                surr1 = ratios * mb_advantages
+                surr2 = (
+                    torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip)
+                    * mb_advantages
+                )
+
+                loss = (
+                    -torch.min(surr1, surr2)
+                    + 0.5 * self.MseLoss(state_values, mb_rewards)
+                    - 0.01 * dist_entropy
+                )
+
+                loss = loss.mean() / grad_accum_steps
+                loss.backward()
+
+                # Освобождаем память GPU
+                torch.cuda.empty_cache()
+
             self.optimizer.step()
+            self.optimizer.zero_grad()
 
         # Обновление старой политики
         self.policy_old.load_state_dict(self.policy.state_dict())
