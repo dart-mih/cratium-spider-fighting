@@ -291,8 +291,8 @@ class PPO:
         """
         test_running_reward = 0
 
+        ep_reward = [0 for _ in range(self.env_count)]
         for ep in range(1, total_test_episodes + 1):
-            ep_reward = [0 for _ in range(self.env_count)]
             states, _ = self.env.reset()
 
             for _ in range(1, self.max_ep_len + 1):
@@ -314,12 +314,12 @@ class PPO:
                 if done:
                     test_running_reward += ep_reward[i]
                     print(f"Эпизод: {ep} \t\t Средняя награда: {round(ep_reward, 2)}")
-
+                    ep_reward = [0 for _ in range(self.env_count)]
                     break
 
         print("-" * 100)
 
-        avg_test_reward = test_running_reward / (total_test_episodes * self.env_count)
+        avg_test_reward = test_running_reward / total_test_episodes
         avg_test_reward = round(avg_test_reward, 2)
         print("Средняя награда в тестировании: " + str(avg_test_reward))
         print("-" * 100)
