@@ -25,7 +25,7 @@ if __name__ == "__main__":
     max_ep_len = int(os.getenv("MAX_EP_LEN"))
 
     max_train_timesteps = int(os.getenv("MAX_TRAIN_TIMESTEPS"))
-    update_timestep_mult = float(os.getenv("UPDATE_TIMESTEP_MULT"))
+    update_min_samples = int(os.getenv("UPDATE_MIN_SAMPLES"))
     print_freq_mult = float(os.getenv("PRINT_FREQ_MULT"))
     log_freq_mult = float(os.getenv("LOG_FREQ_MULT"))
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         env_name=env_name,
         max_ep_len=max_ep_len,
         max_train_timesteps=max_train_timesteps,
-        update_timestep_mult=update_timestep_mult,
+        update_min_samples=update_min_samples,
         print_freq_mult=print_freq_mult,
         log_freq_mult=log_freq_mult,
         k_epochs=k_epochs,

@@ -1,6 +1,28 @@
 import os
 import shutil
 
+import gymnasium as gym
+import craftium
+
+
+def make_env(
+    env_name, frameskip=3, obs_width=128, obs_height=128, render_mode="rgb_array"
+):
+    def _make():
+        env = gym.make(
+            env_name,
+            frameskip=frameskip,
+            obs_width=obs_width,
+            obs_height=obs_height,
+            rgb_observations=False,
+            gray_scale_keepdim=True,
+            render_mode=render_mode,
+            sync_mode=True,
+        )
+        return env
+
+    return _make
+
 
 def delete_minetest_run_folders(root_dir):
     """

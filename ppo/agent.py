@@ -79,17 +79,15 @@ class PPOAgent:
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
         # Преобразование списков в тензоры
-        old_states = (
-            torch.squeeze(torch.stack(buffer.states, dim=0)).detach().to(device)
+        old_states = torch.stack(buffer.states, dim=0).detach().to(device)
+        old_actions = torch.squeeze(
+            torch.stack(buffer.actions, dim=0).detach().to(device)
         )
-        old_actions = (
-            torch.squeeze(torch.stack(buffer.actions, dim=0)).detach().to(device)
+        old_logprobs = torch.squeeze(
+            torch.stack(buffer.logprobs, dim=0).detach().to(device)
         )
-        old_logprobs = (
-            torch.squeeze(torch.stack(buffer.logprobs, dim=0)).detach().to(device)
-        )
-        old_state_values = (
-            torch.squeeze(torch.stack(buffer.state_values, dim=0)).detach().to(device)
+        old_state_values = torch.squeeze(
+            torch.stack(buffer.state_values, dim=0).detach().to(device)
         )
 
         # Вычисление преимущества (advantage)

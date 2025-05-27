@@ -20,7 +20,7 @@ class PPO:
         max_ep_len: int,
         max_train_timesteps: int,
         save_model_freq: int,
-        update_timestep_mult: int = 4,
+        update_min_samples: int,
         k_epochs: int = 80,
         eps_clip: float = 0.2,
         gamma: float = 0.99,
@@ -36,7 +36,7 @@ class PPO:
         :param max_ep_len: макс. длина одного эпизода
         :param max_train_timesteps: общая длина шагов обучения (после скольки шагов обучения прекратится)
         :param save_model_freq: частота сохранения модели (в шагах обучения)
-        :param update_timestep_mult: множитель частоты обновления (множитель к max_ep_len)
+        :param update_min_samples: минимальное число примеров в буфере для обновления весов модели
         :param k_epochs: количество эпох обучения на 1 пакете данных из буфера
         :param eps_clip: коэффициент клипинга PPO (обычно изменяется в пределах 0.2 до 0.3)
         :param gamma: коэффициент дисконтирования (упор на текущую или будущую выгоду)
@@ -55,7 +55,7 @@ class PPO:
         self.print_freq = max_ep_len * print_freq_mult
         self.log_freq = max_ep_len * log_freq_mult
         self.save_model_freq = save_model_freq
-        self.update_timestep = max_ep_len * update_timestep_mult
+        self.update_min_samples = update_min_samples
 
         self.k_epochs = k_epochs
         self.eps_clip = eps_clip
@@ -66,7 +66,7 @@ class PPO:
 
         self.env = env
         self.env_count = env_count
-        self.buffer = RolloutBuffer()
+        self.buffers = [RolloutBuffer() for _ in range(env_count)]
 
         # Получаем размерности состояния и действия среды.
         self.state_dim = env.observation_space.shape[1:]
@@ -147,7 +147,9 @@ class PPO:
         print("Размерность пространства действий: ", self.action_dim)
         print("-" * 100)
 
-        print("Частота обновления PPO: " + str(self.update_timestep) + " шагов")
+        print(
+            "Частота обновления PPO: " + str(self.update_min_samples) + " размер буфера"
+        )
         print("Количество эпох PPO: ", self.k_epochs)
         print("Коэффициент клиппинга PPO: ", self.eps_clip)
         print("Фактор дисконтирования (гамма): ", self.gamma)
@@ -212,13 +214,23 @@ class PPO:
             )
             dones = [term or trunc for term, trunc in zip(terms, truncs)]
 
-            # Сохраняем итерацию в буфер для обучения
-            self.buffer.states.extend(states_t)
-            self.buffer.actions.extend(actions)
-            self.buffer.logprobs.extend(actions_logprob)
-            self.buffer.state_values.extend(state_vals)
-            self.buffer.rewards.extend(rewards)
-            self.buffer.is_terminals.extend(dones)
+            # Сохраняем итерацию в буферы для обучения
+            for i, (
+                state_t,
+                action,
+                action_logprob,
+                state_val,
+                reward,
+                done,
+            ) in enumerate(
+                zip(states_t, actions, actions_logprob, state_vals, rewards, dones)
+            ):
+                self.buffers[i].states.append(state_t)
+                self.buffers[i].actions.append(action)
+                self.buffers[i].logprobs.append(action_logprob)
+                self.buffers[i].state_values.append(state_val)
+                self.buffers[i].rewards.append(reward)
+                self.buffers[i].is_terminals.append(done)
 
             time_step += 1
 
@@ -226,9 +238,10 @@ class PPO:
                 current_ep_reward[i] += rewards[i]
 
             # Обновляем агента PPO
-            if time_step % self.update_timestep == 0:
-                self.ppo_agent.update(self.buffer, self.env_count)
-                self.buffer.clear()
+            if len(self.buffers[0].states) >= self.update_min_samples:
+                for buffer in self.buffers:
+                    self.ppo_agent.update(buffer, self.env_count)
+                    buffer.clear()
 
             # Логгируем среднюю награду
             if time_step % self.log_freq == 0:
@@ -313,7 +326,9 @@ class PPO:
             for i, done in enumerate(dones):
                 if done:
                     test_running_reward += ep_reward[i]
-                    print(f"Эпизод: {ep} \t\t Средняя награда: {round(ep_reward, 2)}")
+                    print(
+                        f"Эпизод: {ep} \t\t Средняя награда: {round(ep_reward[i], 2)}"
+                    )
                     ep_reward = [0 for _ in range(self.env_count)]
                     break
 
