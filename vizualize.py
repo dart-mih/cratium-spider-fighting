@@ -6,17 +6,9 @@ from gymnasium.vector import SyncVectorEnv
 import craftium
 
 from ppo import PPO
-from utility import delete_minetest_run_folders
+from utility import delete_minetest_run_folders, make_env
 
 load_dotenv("parameters.env")
-
-
-def make_env(env_name, frameskip=3):
-    def _make():
-        env = gym.make(env_name, frameskip=frameskip, render_mode="human")
-        return env
-
-    return _make
 
 
 if __name__ == "__main__":
@@ -40,7 +32,7 @@ if __name__ == "__main__":
 
     delete_minetest_run_folders(".")
 
-    env = SyncVectorEnv([make_env(env_name) for _ in range(1)])
+    env = SyncVectorEnv([make_env(env_name, render_mode="human") for _ in range(1)])
 
     ppo = PPO(
         env=env,
