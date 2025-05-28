@@ -26,6 +26,7 @@ def make_env(
             gray_scale_keepdim=True,
             render_mode=render_mode,
             sync_mode=True,
+            minetest_conf={"fov": 120},
         )
         env = FrameStackWrapper(env, frame_stack)
         env = NormalizeWrapper(env)
