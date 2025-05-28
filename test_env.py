@@ -10,11 +10,12 @@ delete_minetest_run_folders(".")
 
 env_name = os.getenv("ENV_NAME")
 
-env = make_env(env_name, obs_height=512, obs_width=512, render_mode="human")()
+env = make_env(
+    env_name, obs_height=512, obs_width=512, frame_stack=1, render_mode="human"
+)()
 iters = 1000
 
 observation, info = env.reset()
-
 ep_ret = 0
 start = time.time()
 for i in range(iters):

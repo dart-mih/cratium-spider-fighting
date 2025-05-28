@@ -22,6 +22,11 @@ if __name__ == "__main__":
     print_freq_mult = float(os.getenv("PRINT_FREQ_MULT"))
     log_freq_mult = float(os.getenv("LOG_FREQ_MULT"))
 
+    frame_stack_size = int(os.getenv("FRAME_STACK_SIZE"))
+    grayscale = os.getenv("GRAYSCALE") == "True"
+    obs_w = int(os.getenv("OBS_W"))
+    obs_h = int(os.getenv("OBS_H"))
+
     k_epochs = int(os.getenv("K_EPOCHS"))
     eps_clip = float(os.getenv("EPS_CLIP"))
     gamma = float(os.getenv("GAMMA"))
@@ -32,7 +37,17 @@ if __name__ == "__main__":
 
     delete_minetest_run_folders(".")
 
-    env = SyncVectorEnv([make_env(env_name) for _ in range(env_count)])
+    env = SyncVectorEnv(
+        [
+            make_env(
+                env_name=env_name,
+                obs_height=obs_h,
+                obs_width=obs_w,
+                grayscale=grayscale,
+            )
+            for _ in range(env_count)
+        ]
+    )
 
     ppo = PPO(
         env=env,
