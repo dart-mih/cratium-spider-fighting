@@ -4,9 +4,17 @@ import shutil
 import gymnasium as gym
 import craftium
 
+from ppo import FrameStackWrapper, NormalizeWrapper
+
 
 def make_env(
-    env_name, frameskip=3, obs_width=128, obs_height=128, render_mode="rgb_array"
+    env_name,
+    frameskip=3,
+    obs_width=64,
+    obs_height=64,
+    frame_stack=4,
+    grayscale=True,
+    render_mode="rgb_array",
 ):
     def _make():
         env = gym.make(
@@ -14,11 +22,13 @@ def make_env(
             frameskip=frameskip,
             obs_width=obs_width,
             obs_height=obs_height,
-            rgb_observations=False,
+            rgb_observations=(not grayscale),
             gray_scale_keepdim=True,
             render_mode=render_mode,
             sync_mode=True,
         )
+        env = FrameStackWrapper(env, frame_stack)
+        env = NormalizeWrapper(env)
         return env
 
     return _make
