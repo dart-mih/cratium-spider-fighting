@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from .buffer import RolloutBuffer
 from .actor_critic import ActorCritic
@@ -57,12 +58,12 @@ class PPOAgent:
 
         return action, action_logprob, state_val, state
 
-    def update(self, buffer: RolloutBuffer, grad_accum_steps: int = 1) -> None:
+    def update(self, buffer: RolloutBuffer, mini_batch_size: int = 128) -> None:
         """
-        Обновляет политику на основе буфера с помощью метода Монте-Карло с поддержкой накопления градиентов.
+        Обновляет политику на основе буфера с помощью метода Монте-Карло с обучением на мини-батчах.
 
         :param buffer: экземпляр RolloutBuffer с собранными данными для обучения
-        :param grad_accum_steps: количество шагов для накопления градиентов перед обновлением весов
+        :param mini_batch_size: размер мини-батча для обучения
         """
         rewards = []
         discounted_reward = 0
@@ -90,15 +91,11 @@ class PPOAgent:
             torch.stack(buffer.state_values, dim=0).detach().to(device)
         )
 
-        # Вычисление преимущества (advantage)
         advantages = rewards.detach() - old_state_values.detach()
 
-        # Разбиваем данные на мини-батчи для gradient accumulation
-        batch_size = len(buffer.states)
-        mini_batch_size = batch_size // grad_accum_steps
-
         # Оптимизация политики в течение K эпох
-        for _ in range(self.K_epochs):
+        for _ in tqdm(range(self.K_epochs), "Эпоха обновления весов"):
+            batch_size = len(buffer.states)
             indices = torch.randperm(batch_size, device=device)
 
             for start in range(0, batch_size, mini_batch_size):
@@ -132,14 +129,10 @@ class PPOAgent:
                     - 0.01 * dist_entropy
                 )
 
-                loss = loss.mean() / grad_accum_steps
-                loss.backward()
-
-                # Освобождаем память GPU
-                torch.cuda.empty_cache()
-
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+                # Оптимизация для каждого мини-батча
+                self.optimizer.zero_grad()
+                loss.mean().backward()
+                self.optimizer.step()
 
         # Обновление старой политики
         self.policy_old.load_state_dict(self.policy.state_dict())

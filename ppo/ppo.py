@@ -240,7 +240,7 @@ class PPO:
             # Обновляем агента PPO
             if len(self.buffers[0].states) >= self.update_min_samples:
                 for buffer in self.buffers:
-                    self.ppo_agent.update(buffer, self.env_count)
+                    self.ppo_agent.update(buffer)
                     buffer.clear()
 
             # Логгируем среднюю награду
