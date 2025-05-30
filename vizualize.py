@@ -44,7 +44,7 @@ if __name__ == "__main__":
                 obs_height=obs_h,
                 obs_width=obs_w,
                 grayscale=grayscale,
-                render_mode="human",
+                record_video=True,
             )
             for _ in range(1)
         ]

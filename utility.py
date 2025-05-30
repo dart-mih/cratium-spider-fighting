@@ -2,6 +2,7 @@ import os
 import shutil
 
 import gymnasium as gym
+from gymnasium.wrappers.record_video import RecordVideo
 import craftium
 
 from ppo import FrameStackWrapper, NormalizeWrapper
@@ -15,6 +16,7 @@ def make_env(
     frame_stack=4,
     grayscale=True,
     render_mode="rgb_array",
+    record_video=False,
 ):
     def _make():
         env = gym.make(
@@ -28,8 +30,12 @@ def make_env(
             sync_mode=True,
             minetest_conf={"fov": 120},
         )
-        env = FrameStackWrapper(env, frame_stack)
+        if frame_stack > 1:
+            env = FrameStackWrapper(env, frame_stack)
         env = NormalizeWrapper(env)
+
+        if record_video:
+            env = RecordVideo(env, "videos")
         return env
 
     return _make
